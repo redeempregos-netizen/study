@@ -124,18 +124,29 @@ export default async function Home() {
                   <p className="text-sm font-bold uppercase tracking-widest text-indigo-200">Tarefas reais do plano</p>
                   <h3 className="mt-2 text-2xl font-black">Cronograma gerado</h3>
                 </div>
-                <p className="text-sm text-slate-400">Dados vindos da tabela study_plan_items.</p>
+                <p className="text-sm text-slate-400">Atualiza automaticamente após concluir.</p>
               </div>
 
               <div className="mt-6 space-y-3">
                 {planItems?.length ? planItems.map((item: any) => (
-                  <div key={item.id} className="grid gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 md:grid-cols-[90px_160px_1fr_90px_100px_120px] md:items-center">
+                  <div key={item.id} className="grid gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 xl:grid-cols-[90px_140px_1fr_80px_90px_120px_140px] xl:items-center">
                     <p className="font-bold text-indigo-200">{item.day_label}</p>
                     <p className="font-semibold">{item.subject}</p>
                     <p className="text-sm text-slate-300">{item.task}</p>
                     <p className="text-sm">{item.estimated_minutes} min</p>
                     <p className="text-sm text-amber-200">{item.priority}</p>
-                    <span className="rounded-full bg-white/10 px-3 py-1 text-center text-xs font-bold">{item.status}</span>
+                    <span className={item.status === 'concluido' ? 'rounded-full bg-emerald-500/20 px-3 py-1 text-center text-xs font-bold text-emerald-300' : 'rounded-full bg-white/10 px-3 py-1 text-center text-xs font-bold'}>
+                      {item.status === 'concluido' ? 'Concluído' : item.status}
+                    </span>
+                    {item.status === 'concluido' ? (
+                      <div className="rounded-2xl bg-emerald-500/20 px-4 py-3 text-center text-sm font-bold text-emerald-300">✓ Feito</div>
+                    ) : (
+                      <form action="/api/tasks/complete" method="post">
+                        <input type="hidden" name="task_id" value={item.id} />
+                        <input type="hidden" name="plan_id" value={item.plan_id} />
+                        <button className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-400">Concluir</button>
+                      </form>
+                    )}
                   </div>
                 )) : <p className="rounded-2xl bg-slate-900 p-5 text-sm text-slate-400">Nenhuma tarefa ainda. Envie um PDF e clique em Gerar plano.</p>}
               </div>
