@@ -124,8 +124,19 @@ export default async function Home() {
                 <div className="mt-5 space-y-3">
                   {documents?.length ? documents.map((doc: any) => (
                     <div key={doc.id} className="rounded-2xl bg-slate-900 p-4">
-                      <p className="font-bold">{doc.title}</p>
-                      <p className="text-sm text-slate-400">{doc.file_url ? 'Arquivo salvo no Storage' : 'Sem arquivo vinculado'}</p>
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="font-bold">{doc.title}</p>
+                          <p className="text-sm text-slate-400">Status: {doc.status || 'enviado'}</p>
+                          <p className="text-sm text-slate-500">{doc.file_url ? 'Arquivo salvo no Storage' : 'Sem arquivo vinculado'}</p>
+                        </div>
+                        <form action="/api/plans/generate" method="post">
+                          <input type="hidden" name="document_id" value={doc.id} />
+                          <button className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-400">
+                            Gerar plano
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   )) : <p className="text-sm text-slate-400">Nenhum documento enviado ainda.</p>}
                 </div>
