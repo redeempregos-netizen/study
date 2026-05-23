@@ -70,3 +70,7 @@ Tabelas principais planejadas:
 - questions
 - answers
 - progress
+
+## Status
+
+Deploy atualizado para validar a configuração do Tailwind CSS com Next.js.
