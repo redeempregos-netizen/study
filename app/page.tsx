@@ -18,9 +18,7 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const [{ data: profile }, { data: documents }, { data: plans }, { data: questions }, { data: answers }, { data: progress }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
@@ -31,11 +29,22 @@ export default async function Home() {
     supabase.from('progress').select('*').eq('user_id', user.id).order('accuracy', { ascending: true }),
   ])
 
+  const activePlan = plans?.[0]
+  const { data: planItems } = activePlan
+    ? await supabase
+        .from('study_plan_items')
+        .select('*')
+        .eq('plan_id', activePlan.id)
+        .order('created_at', { ascending: true })
+    : { data: [] }
+
   const totalAnswers = answers?.length || 0
   const correctAnswers = answers?.filter((answer: any) => answer.is_correct).length || 0
   const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0
-  const activePlan = plans?.[0]
   const weakSubjects = progress?.slice(0, 3) || []
+  const completedTasks = planItems?.filter((item: any) => item.status === 'concluido').length || 0
+  const totalTasks = planItems?.length || 0
+  const planProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : activePlan?.progress || 0
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -75,7 +84,7 @@ export default async function Home() {
               <Card label="PDFs enviados" value={documents?.length || 0} detail="Documentos salvos no Supabase" />
               <Card label="Questões geradas" value={questions?.length || 0} detail="Questões vinculadas ao usuário" />
               <Card label="Taxa de acerto" value={`${accuracy}%`} detail={`${correctAnswers} certas de ${totalAnswers}`} />
-              <Card label="Planos criados" value={plans?.length || 0} detail="Cronogramas de estudo" />
+              <Card label="Tarefas do plano" value={totalTasks} detail={`${completedTasks} concluídas`} />
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
@@ -83,12 +92,12 @@ export default async function Home() {
                 <p className="text-sm font-bold uppercase tracking-widest text-indigo-200">Plano ativo</p>
                 <h3 className="mt-3 text-3xl font-black">{activePlan?.title || 'Nenhum plano ativo ainda'}</h3>
                 <p className="mt-3 max-w-2xl text-slate-300">
-                  {activePlan ? 'Seu plano foi carregado do Supabase e será atualizado conforme você avança.' : 'Envie um PDF para gerar seu primeiro plano de estudo com IA.'}
+                  {activePlan ? 'Seu plano foi carregado do Supabase e as tarefas reais aparecem abaixo.' : 'Envie um PDF para gerar seu primeiro plano de estudo com IA.'}
                 </p>
                 <div className="mt-6 h-4 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-indigo-400" style={{ width: `${activePlan?.progress || 0}%` }} />
+                  <div className="h-full rounded-full bg-indigo-400" style={{ width: `${planProgress}%` }} />
                 </div>
-                <p className="mt-3 text-sm text-slate-400">{activePlan?.progress || 0}% concluído</p>
+                <p className="mt-3 text-sm text-slate-400">{planProgress}% concluído</p>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[.04] p-7">
@@ -106,6 +115,29 @@ export default async function Home() {
                     </div>
                   )) : <p className="text-sm text-slate-400">Responda questões para identificar seus pontos fracos.</p>}
                 </div>
+              </div>
+            </section>
+
+            <section id="plano" className="rounded-3xl border border-white/10 bg-white/[.04] p-7">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-widest text-indigo-200">Tarefas reais do plano</p>
+                  <h3 className="mt-2 text-2xl font-black">Cronograma gerado</h3>
+                </div>
+                <p className="text-sm text-slate-400">Dados vindos da tabela study_plan_items.</p>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                {planItems?.length ? planItems.map((item: any) => (
+                  <div key={item.id} className="grid gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 md:grid-cols-[90px_160px_1fr_90px_100px_120px] md:items-center">
+                    <p className="font-bold text-indigo-200">{item.day_label}</p>
+                    <p className="font-semibold">{item.subject}</p>
+                    <p className="text-sm text-slate-300">{item.task}</p>
+                    <p className="text-sm">{item.estimated_minutes} min</p>
+                    <p className="text-sm text-amber-200">{item.priority}</p>
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-center text-xs font-bold">{item.status}</span>
+                  </div>
+                )) : <p className="rounded-2xl bg-slate-900 p-5 text-sm text-slate-400">Nenhuma tarefa ainda. Envie um PDF e clique em Gerar plano.</p>}
               </div>
             </section>
 
@@ -132,9 +164,7 @@ export default async function Home() {
                         </div>
                         <form action="/api/plans/generate" method="post">
                           <input type="hidden" name="document_id" value={doc.id} />
-                          <button className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-400">
-                            Gerar plano
-                          </button>
+                          <button className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-400">Gerar plano</button>
                         </form>
                       </div>
                     </div>
@@ -147,7 +177,7 @@ export default async function Home() {
               <p className="text-sm font-bold uppercase tracking-widest text-indigo-200">Desempenho</p>
               <h3 className="mt-2 text-2xl font-black">Recomendações da IA</h3>
               <div className="mt-5 grid gap-4 md:grid-cols-3">
-                <div className="rounded-2xl bg-slate-900 p-5"><b>Próximo passo</b><p className="mt-2 text-sm text-slate-400">Envie um PDF e gere seu primeiro plano.</p></div>
+                <div className="rounded-2xl bg-slate-900 p-5"><b>Próximo passo</b><p className="mt-2 text-sm text-slate-400">Conclua as tarefas do plano e responda questões.</p></div>
                 <div className="rounded-2xl bg-slate-900 p-5"><b>Questões</b><p className="mt-2 text-sm text-slate-400">As questões serão criadas a partir do documento enviado.</p></div>
                 <div className="rounded-2xl bg-slate-900 p-5"><b>Revisões</b><p className="mt-2 text-sm text-slate-400">A IA vai ajustar o cronograma com base nos seus erros.</p></div>
               </div>
