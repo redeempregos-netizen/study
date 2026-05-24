@@ -49,7 +49,6 @@ async function extractPagesFromPdf(buffer: ArrayBuffer): Promise<ExtractedPage[]
 
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(buffer),
-    disableWorker: true,
   })
 
   const pdf = await loadingTask.promise
