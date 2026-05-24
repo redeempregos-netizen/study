@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { UploadPdfDirect } from '@/components/upload-pdf-direct'
 
 function Card({ label, value, detail }: { label: string; value: string | number; detail: string }) {
   return (
@@ -82,7 +83,7 @@ export default async function Home() {
           <div className="space-y-8 p-5 lg:p-8">
             <section id="dashboard" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Card label="PDFs enviados" value={documents?.length || 0} detail="Documentos salvos no Supabase" />
-              <Card label="Questões geradas" value={questions?.length || 0} detail="Questões vinculadas ao usuário" />
+              <Card label="Questões extraídas" value={questions?.length || 0} detail="Questões reais do PDF" />
               <Card label="Taxa de acerto" value={`${accuracy}%`} detail={`${correctAnswers} certas de ${totalAnswers}`} />
               <Card label="Tarefas do plano" value={totalTasks} detail={`${completedTasks} concluídas`} />
             </section>
@@ -114,6 +115,46 @@ export default async function Home() {
                       </div>
                     </div>
                   )) : <p className="text-sm text-slate-400">Responda questões para identificar seus pontos fracos.</p>}
+                </div>
+              </div>
+            </section>
+
+            <section id="upload" className="grid gap-6 xl:grid-cols-[.9fr_1.1fr]">
+              <div className="rounded-3xl border border-dashed border-indigo-400/40 bg-indigo-500/5 p-7">
+                <p className="text-sm font-bold uppercase tracking-widest text-indigo-200">Upload direto para Supabase</p>
+                <h3 className="mt-3 text-2xl font-black">Envie o caderno de questões em PDF</h3>
+                <p className="mt-2 text-sm text-slate-400">O arquivo sobe direto para o Storage, sem passar pelo limite da Vercel.</p>
+                <UploadPdfDirect />
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-white/[.04] p-7">
+                <h3 className="text-xl font-black">Documentos enviados</h3>
+                <div className="mt-5 space-y-3">
+                  {documents?.length ? documents.map((doc: any) => (
+                    <div key={doc.id} className="rounded-2xl bg-slate-900 p-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="font-bold">{doc.title}</p>
+                          <p className="text-sm text-slate-400">Status: {doc.status || 'enviado'}</p>
+                          <p className="text-sm text-slate-500">{doc.total_questions || 0} questões extraídas</p>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <form action="/api/documents/process" method="post">
+                            <input type="hidden" name="document_id" value={doc.id} />
+                            <button className="rounded-2xl bg-purple-600 px-4 py-3 text-sm font-bold text-white hover:bg-purple-500">
+                              Processar PDF
+                            </button>
+                          </form>
+                          <form action="/api/plans/generate" method="post">
+                            <input type="hidden" name="document_id" value={doc.id} />
+                            <button className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-400">
+                              Gerar plano
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-slate-400">Nenhum documento enviado ainda.</p>}
                 </div>
               </div>
             </section>
@@ -152,44 +193,12 @@ export default async function Home() {
               </div>
             </section>
 
-            <section id="upload" className="grid gap-6 xl:grid-cols-[.9fr_1.1fr]">
-              <div className="rounded-3xl border border-dashed border-indigo-400/40 bg-indigo-500/5 p-7">
-                <p className="text-sm font-bold uppercase tracking-widest text-indigo-200">Upload de PDF</p>
-                <h3 className="mt-3 text-2xl font-black">Envie edital, apostila ou caderno</h3>
-                <form action="/api/documents/upload" method="post" encType="multipart/form-data" className="mt-6 space-y-4">
-                  <input name="file" type="file" accept="application/pdf" className="w-full rounded-2xl border border-white/10 bg-slate-900 p-4 text-sm" />
-                  <button className="w-full rounded-2xl bg-indigo-500 px-5 py-4 font-bold hover:bg-indigo-400">Enviar PDF</button>
-                </form>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-white/[.04] p-7">
-                <h3 className="text-xl font-black">Documentos enviados</h3>
-                <div className="mt-5 space-y-3">
-                  {documents?.length ? documents.map((doc: any) => (
-                    <div key={doc.id} className="rounded-2xl bg-slate-900 p-4">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="font-bold">{doc.title}</p>
-                          <p className="text-sm text-slate-400">Status: {doc.status || 'enviado'}</p>
-                          <p className="text-sm text-slate-500">{doc.file_url ? 'Arquivo salvo no Storage' : 'Sem arquivo vinculado'}</p>
-                        </div>
-                        <form action="/api/plans/generate" method="post">
-                          <input type="hidden" name="document_id" value={doc.id} />
-                          <button className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-400">Gerar plano</button>
-                        </form>
-                      </div>
-                    </div>
-                  )) : <p className="text-sm text-slate-400">Nenhum documento enviado ainda.</p>}
-                </div>
-              </div>
-            </section>
-
             <section id="desempenho" className="rounded-3xl border border-white/10 bg-white/[.04] p-7">
               <p className="text-sm font-bold uppercase tracking-widest text-indigo-200">Desempenho</p>
               <h3 className="mt-2 text-2xl font-black">Recomendações da IA</h3>
               <div className="mt-5 grid gap-4 md:grid-cols-3">
-                <div className="rounded-2xl bg-slate-900 p-5"><b>Próximo passo</b><p className="mt-2 text-sm text-slate-400">Conclua as tarefas do plano e responda questões.</p></div>
-                <div className="rounded-2xl bg-slate-900 p-5"><b>Questões</b><p className="mt-2 text-sm text-slate-400">As questões serão criadas a partir do documento enviado.</p></div>
+                <div className="rounded-2xl bg-slate-900 p-5"><b>Próximo passo</b><p className="mt-2 text-sm text-slate-400">Envie, processe o PDF e comece a responder questões reais.</p></div>
+                <div className="rounded-2xl bg-slate-900 p-5"><b>Questões</b><p className="mt-2 text-sm text-slate-400">As questões são extraídas diretamente do caderno enviado.</p></div>
                 <div className="rounded-2xl bg-slate-900 p-5"><b>Revisões</b><p className="mt-2 text-sm text-slate-400">A IA vai ajustar o cronograma com base nos seus erros.</p></div>
               </div>
             </section>
