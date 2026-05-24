@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { extractQuestionsFromPdf } from '@/lib/pdf-parser'
 
 export async function POST(request: Request) {
   const supabase = createClient()
@@ -37,13 +38,46 @@ export async function POST(request: Request) {
     data: { publicUrl },
   } = supabase.storage.from('study-pdfs').getPublicUrl(fileName)
 
-  await supabase.from('documents').insert({
-    user_id: user.id,
-    title: file.name,
-    document_type: 'pdf',
-    file_url: publicUrl,
-    status: 'enviado',
-  })
+  const { data: document } = await supabase
+    .from('documents')
+    .insert({
+      user_id: user.id,
+      title: file.name,
+      document_type: 'pdf',
+      file_url: publicUrl,
+      status: 'processando',
+    })
+    .select()
+    .single()
+
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const extractedQuestions = await extractQuestionsFromPdf(arrayBuffer)
+
+    if (extractedQuestions.length) {
+      await supabase.from('questions').insert(
+        extractedQuestions.map((question) => ({
+          ...question,
+          user_id: user.id,
+          extracted_from_pdf: true,
+        }))
+      )
+    }
+
+    await supabase
+      .from('documents')
+      .update({
+        status: 'concluido',
+        total_questions: extractedQuestions.length,
+        processed_at: new Date().toISOString(),
+      })
+      .eq('id', document.id)
+  } catch (error) {
+    await supabase
+      .from('documents')
+      .update({ status: 'erro ao processar' })
+      .eq('id', document.id)
+  }
 
   return NextResponse.redirect(new URL('/', request.url))
 }
