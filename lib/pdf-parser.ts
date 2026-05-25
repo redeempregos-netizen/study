@@ -45,7 +45,7 @@ function extractOption(text: string, letter: string, nextLetter?: string) {
 }
 
 async function extractPagesFromPdf(buffer: ArrayBuffer): Promise<ExtractedPage[]> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js')
 
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(buffer),
