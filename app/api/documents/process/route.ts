@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { extractQuestionsFromPdf } from '@/lib/pdf-parser'
 
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   const supabase = createClient()
 
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
 
   await supabase
     .from('documents')
-    .update({ status: 'processando' })
+    .update({ status: 'baixando pdf' })
     .eq('id', document.id)
 
   try {
@@ -42,20 +45,38 @@ export async function POST(request: Request) {
       .download(document.file_path)
 
     if (error || !data) {
-      throw new Error('Erro ao baixar PDF do Storage')
+      throw new Error(error?.message || 'Erro ao baixar PDF do Storage')
     }
+
+    await supabase
+      .from('documents')
+      .update({ status: 'extraindo questões' })
+      .eq('id', document.id)
 
     const buffer = await data.arrayBuffer()
     const extractedQuestions = await extractQuestionsFromPdf(buffer)
 
+    await supabase
+      .from('documents')
+      .update({ status: `extraídas ${extractedQuestions.length} questões` })
+      .eq('id', document.id)
+
     if (extractedQuestions.length) {
-      await supabase.from('questions').insert(
-        extractedQuestions.map((question) => ({
+      const batchSize = 100
+
+      for (let i = 0; i < extractedQuestions.length; i += batchSize) {
+        const batch = extractedQuestions.slice(i, i + batchSize).map((question) => ({
           ...question,
           user_id: user.id,
           extracted_from_pdf: true,
         }))
-      )
+
+        const { error: insertError } = await supabase.from('questions').insert(batch)
+
+        if (insertError) {
+          throw new Error(insertError.message)
+        }
+      }
     }
 
     await supabase
@@ -66,10 +87,10 @@ export async function POST(request: Request) {
         processed_at: new Date().toISOString(),
       })
       .eq('id', document.id)
-  } catch (error) {
+  } catch (error: any) {
     await supabase
       .from('documents')
-      .update({ status: 'erro ao processar' })
+      .update({ status: `erro: ${String(error?.message || error).slice(0, 120)}` })
       .eq('id', document.id)
   }
 
